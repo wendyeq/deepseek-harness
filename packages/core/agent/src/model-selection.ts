@@ -7,6 +7,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import {
   boundContextSummary,
   createUserMessage,
+  isModelSelector,
   type LlmCallConfig,
   type ReasoningEffortId,
 } from '@deepseek-ai/dsh-llm'
@@ -71,7 +72,8 @@ function modelSwitchNotice(previous: ModelSelection, selected: ModelSelection) {
  * A provider/model change appends a durable user-role notice to the next
  * admitted request. It compares the assembled selection with the latest
  * request header; effort-only changes and empty no-request decisions add no
- * notice. Failure before header persistence repeats the notice on the next
+ * notice. Plugin-owned model selectors add no concrete-model notice.
+ * Failure before header persistence repeats the notice on the next
  * request.
  *
  * @param agentCtx - The selected Agent's scoped context.
@@ -119,7 +121,8 @@ export function installModelSelection(agentCtx: Context, selection: ModelSelecti
       if (decision.messages.length === 0 && (step === 1 || messages.length > 0)) return decision
       const selected = selection.assembled
       const previous = agent.session.requestHeader()?.config
-      if (selected === undefined || previous === undefined || sameRoute(selected, previous)) return decision
+      if (selected === undefined || previous === undefined || sameRoute(selected, previous)
+        || isModelSelector(agentCtx, selected.provider, selected.model)) return decision
       return { ...decision, messages: [...decision.messages, modelSwitchNotice(previous, selected)] }
     },
     { prepend: true },

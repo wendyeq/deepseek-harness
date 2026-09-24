@@ -87,7 +87,13 @@ export function serialize(
   if (options.tools?.some(tool => tool.deferLoading === true)) return unsupported('deferred tool loading')
   for (const message of history) {
     // Developer history is persisted for V4; provider serialization is intentionally deferred.
-    if (message.role === 'developer') return unsupported('developer message')
+    if (message.role === 'developer') {
+      // OpenAI configuration updates are replayed as developer messages. DeepSeek has no
+      // equivalent item; dropping them keeps the request-level effort instead of failing.
+      const updates = message.content.length > 0 && message.content.every(block => block.type === 'configuration-update')
+      if (updates) continue
+      return unsupported('developer message')
+    }
     if (message.content.some(block => block.type === 'tool-addition' || block.type === 'tool-removal')) {
       return unsupported('tool-change blocks outside developer messages')
     }

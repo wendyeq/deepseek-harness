@@ -39,6 +39,9 @@ import {
 } from './content.ts'
 import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment'
 
+import { resolveAuxiliaryOptions } from './selection.ts'
+
+export * from './selection.ts'
 export * from './attribution.ts'
 export * from './brand.ts'
 export * from './error.ts'
@@ -1110,7 +1113,13 @@ export class LlmRuntime extends TypertRemoteService {
    * @returns the chunk stream, possibly wrapped by `llm/stream` listeners.
    */
   stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
-    return this.streamWithRegistration(options)
+    return options.purpose === undefined
+      ? this.streamWithRegistration(options)
+      : this.auxiliaryStream(options)
+  }
+
+  private async * auxiliaryStream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+    yield* this.streamWithRegistration(await resolveAuxiliaryOptions(this.ctx, options))
   }
 
   private streamWithRegistration(

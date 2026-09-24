@@ -6,7 +6,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { createUserMessage, BlockAssembler } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, BlockAssembler, resolveAuxiliaryOptions } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -251,23 +251,24 @@ export async function generateSessionTitleWithLlm(
   if (inputBytes > config.maxInputBytes) {
     throw new Error(`session-title-llm: input is ${inputBytes} bytes, exceeding maxInputBytes ${config.maxInputBytes}`)
   }
-  const route = resolveRoute(config, request)
+  const proposedRoute = resolveRoute(config, request)
   const messages: Message[] = [createUserMessage({
     content: [{ type: 'text', text: framedInput }],
     source: { kind: 'dsh-session-title-llm' },
   })]
   const system = systemPrompt(config)
   using callDeadline = deadline(request.signal, config.timeoutMs, SESSION_TITLE_TIMEOUT_CODE)
-  const options: GenerateOptions = deepFreeze({
-    provider: route.provider,
-    model: route.model,
+  const options: GenerateOptions = deepFreeze(await resolveAuxiliaryOptions(ctx, {
+    provider: proposedRoute.provider,
+    model: proposedRoute.model,
     messages,
     system,
     maxTokens: config.maxOutputTokens,
     sessionId: request.session.id,
     purpose: 'session-title',
     signal: callDeadline.signal,
-  })
+  }))
+  const route = { provider: options.provider, model: options.model }
   request.session.append('session/title-llm-request', {
     titleProvider,
     messageSeqs: selectedMessages.map(message => message.seq),

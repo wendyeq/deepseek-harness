@@ -12,6 +12,7 @@ import type { FileUploadReceiptId } from '@deepseek-ai/dsh-client-file-upload/ty
 import type {} from '@deepseek-ai/dsh-client-file-upload'
 import {
   ReasoningEffortId, assistantStreamChunks, createUserMessage, freezeMessage,
+  resolveModelSelection, resolveSelectionModelInfo,
 } from '@deepseek-ai/dsh-llm'
 import type { MessageSource } from '@deepseek-ai/dsh-llm'
 import { buildForkSeed } from '@deepseek-ai/dsh-session/fork'
@@ -151,7 +152,7 @@ export class SessionCommandController {
     const agent = await this.resolveAgent(request.sessionId)
     return this.agents.serializeImageAdmission(agent, async () => {
       try {
-        const resolved = await this.ctx.llm.resolveCallConfig({
+        const resolved = await resolveModelSelection(this.ctx, {
           provider: request.provider,
           model: request.model,
           ...(request.reasoningEffort === undefined
@@ -329,10 +330,12 @@ export class SessionCommandController {
     const agent = await this.resolveAgent(request.sessionId)
     if (hasPromptRequest(agent, request.requestId)) return { accepted: true }
     const selection = this.agents.selectionFor(agent).current
-    if (!routeServed(this.ctx, selection.provider)) {
+    try {
+      await resolveModelSelection(this.ctx, selection)
+    } catch (error) {
       throw new RemoteError(
         'session/model-unavailable',
-        `no adapter serves provider "${selection.provider}"; select a model for this session`,
+        error instanceof Error ? error.message : String(error),
         { provider: selection.provider, model: selection.model },
       )
     }
@@ -346,7 +349,7 @@ export class SessionCommandController {
       try {
         if (hasImage) {
           const current = this.agents.selectionFor(agent).current
-          const model = await this.ctx.llm.resolveModelInfo(current.provider, current.model)
+          const model = await resolveSelectionModelInfo(this.ctx, current.provider, current.model)
           if (model.inputModalities !== undefined && !model.inputModalities.includes('image')) {
             throw new RemoteError(
               'session/attachment-invalid',
@@ -689,8 +692,4 @@ function referencedImage(
     if (found !== undefined) return found
   }
   return undefined
-}
-
-function routeServed(ctx: Context, provider: string): boolean {
-  return ctx.llm.listProviders().some(entry => entry.id === provider)
 }

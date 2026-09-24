@@ -7,6 +7,16 @@ import type {
   ModelSelection,
 } from './types.ts'
 
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    /**
+     * Extend the browser catalog with plugin-owned selectors, not generation adapters.
+     * @mode waterfall
+     */
+    'session/model-catalog'(next: () => Promise<ModelCatalog>): Promise<ModelCatalog>
+  }
+}
+
 /**
  * Build the browser model catalog without requiring a Session.
  * @param ctx - Host context carrying the live LLM registry.
@@ -57,11 +67,11 @@ export async function buildModelCatalog(
       }
     }
   }))
-  return {
+  return ctx.waterfall('session/model-catalog', () => Promise.resolve({
     default: { ...defaultSelection },
     routableProviders: providers.map(provider => provider.id),
     groups: catalog.flatMap(item => item.kind === 'group' ? [item.group] : [])
       .filter(group => group.models.length > 0),
     failures: catalog.flatMap(item => item.kind === 'failure' ? [item.failure] : []),
-  }
+  }))
 }

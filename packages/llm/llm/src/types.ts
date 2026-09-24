@@ -130,6 +130,20 @@ export interface ToolRemovalBlock {
 }
 
 /**
+ * One mid-conversation reasoning-effort change for a concrete model route.
+ * Adapters replay it in place. It is not assistant output, so chat and compaction do not render it.
+ */
+export interface ConfigurationUpdateBlock {
+  type: 'configuration-update'
+  /** Effort in force from this point until the next update for the same route. */
+  effort: string
+  /** Provider whose request this update applies to. */
+  provider: string
+  /** Model id whose request this update applies to. */
+  model: string
+}
+
+/**
  * Merge-extensible content blocks keyed by `type`. New core blocks must land
  * with adapter, UI, and compaction support. Developer tool-change blocks are
  * reserved for Session V4 persistence; providers and UI reject them until
@@ -143,6 +157,7 @@ export interface ContentBlockMap {
   'tool-call': ToolCallBlock
   'tool-addition': ToolAdditionBlock
   'tool-removal': ToolRemovalBlock
+  'configuration-update': ConfigurationUpdateBlock
 }
 
 /** The block `type` tag vocabulary; widens as plugins add entries to {@link ContentBlockMap}. */
